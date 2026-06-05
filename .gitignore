@@ -1,0 +1,23 @@
+.gradle/
+.idea/
+build/
+*/build/
+local.properties
+
+# Local Mewgenics assets. These are extracted from your own Steam install
+# for private testing only and must not be committed or redistributed.
+/local-assets/
+/extracted-assets/
+/dist/
+/app/src/main/assets/radio/
+/app/src/debug/assets/radio/
+*.gpak
+*.bak
+*.ogg
+*.opus
+*.swf
+
+# Android Studio / OS noise
+*.iml
+.DS_Store
+Thumbs.db
