@@ -9,6 +9,10 @@ val radioManifestUrl = providers.gradleProperty("RADIO_MANIFEST_URL")
     .orElse(providers.environmentVariable("RADIO_MANIFEST_URL"))
     .orElse("")
     .get()
+val allowCleartextRelease = providers.gradleProperty("ALLOW_CLEARTEXT")
+    .orElse(providers.environmentVariable("ALLOW_CLEARTEXT"))
+    .orElse("false")
+    .get()
 
 android {
     namespace = "com.local.mewgenicsradio"
@@ -32,9 +36,20 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "RADIO_MANIFEST_URL", "\"$radioManifestUrl\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+        }
+        create("onlineDebug") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            applicationIdSuffix = ".online"
+            versionNameSuffix = "-online"
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "RADIO_MANIFEST_URL", "\"$radioManifestUrl\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
             buildConfigField("String", "RADIO_MANIFEST_URL", "\"$radioManifestUrl\"")
+            manifestPlaceholders["usesCleartextTraffic"] = allowCleartextRelease
         }
     }
 

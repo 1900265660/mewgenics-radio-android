@@ -99,6 +99,38 @@ dist/radio-assets/128kbps/audio/music/radio/**/*.opus
 `dist/` and `.opus` files are ignored by Git. Upload this folder to your CDN or
 local test server, then set `RADIO_MANIFEST_URL` in the Android build config.
 
+## Local Streaming Test Server
+
+For LAN testing before a real CDN exists, generate the manifest with your
+computer's LAN IP and serve the output folder:
+
+```powershell
+$lanIp = "10.99.239.143"
+powershell -ExecutionPolicy Bypass -File .\tools\convert-radio-assets.ps1 -BitrateKbps 128 -BaseUrl "http://$lanIp:8088/"
+python .\tools\serve-radio-assets.py --root .\dist\radio-assets\128kbps --host 0.0.0.0 --port 8088
+```
+
+The server supports HTTP byte ranges, which Media3/ExoPlayer expects for
+reliable streaming. Smoke test it from another PowerShell window:
+
+```powershell
+Invoke-WebRequest "http://127.0.0.1:8088/manifest.json"
+curl.exe -I -r 0-99 "http://127.0.0.1:8088/audio/music/radio/songs/catsanova.opus"
+```
+
+Debug builds allow cleartext HTTP for local testing. Release builds keep
+cleartext disabled unless you explicitly opt in:
+
+```powershell
+.\gradlew.bat :app:assembleDebug -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json"
+.\gradlew.bat :app:assembleOnlineDebug -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json"
+.\gradlew.bat :app:assembleRelease -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json" -PALLOW_CLEARTEXT=true
+```
+
+Use `onlineDebug` for normal local streaming tests. It is signed with the debug
+key and does not include `app/src/debug/assets/radio`, so the APK stays small
+while still using the local HTTP server.
+
 ## Build
 
 Once Android Studio has installed the Android SDK, run:

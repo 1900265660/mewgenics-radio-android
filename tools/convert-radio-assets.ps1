@@ -15,6 +15,11 @@ function Require-Command($name) {
     }
 }
 
+function Convert-ToUrlPath($path) {
+    $segments = ($path -split "/") | ForEach-Object { [uri]::EscapeDataString($_) }
+    [string]::Join("/", $segments)
+}
+
 Require-Command "ffmpeg"
 Require-Command "ffprobe"
 
@@ -62,13 +67,14 @@ foreach ($input in $inputFiles) {
     $hash = (Get-FileHash -Path $outputPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $size = (Get-Item -Path $outputPath).Length
     $urlPath = ("audio/music/radio/" + ($outputRelative -replace "\\", "/"))
+    $encodedUrlPath = Convert-ToUrlPath $urlPath
     $base = if ($BaseUrl.EndsWith("/")) { $BaseUrl } else { "$BaseUrl/" }
 
     $tracks.Add([ordered]@{
         id = [System.IO.Path]::GetFileNameWithoutExtension($outputPath)
         category = $category
         relativePath = $urlPath
-        url = "$base$urlPath"
+        url = "$base$encodedUrlPath"
         bytes = $size
         sha256 = $hash
         durationMs = $durationMs
@@ -91,7 +97,10 @@ $manifest = [ordered]@{
 $manifestPath = Join-Path $qualityRoot "manifest.json"
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $manifestPath -Encoding UTF8
 
-$totalBytes = ($tracks | Measure-Object bytes -Sum).Sum
+$totalBytes = 0L
+foreach ($track in $tracks) {
+    $totalBytes += [int64]$track["bytes"]
+}
 Write-Output "Converted tracks: $($tracks.Count)"
 Write-Output "Total bytes: $totalBytes"
 Write-Output "Manifest: $manifestPath"
