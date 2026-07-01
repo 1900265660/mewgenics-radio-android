@@ -43,6 +43,40 @@ class RemoteAssetSystemTest {
     }
 
     @Test
+    fun manifestNormalizationRewritesStaleBaseUrlAndTrackUrls() {
+        val manifest = RemoteRadioManifestParser.parse(
+            """
+            {
+              "version": 1,
+              "baseUrl": "http://10.99.239.143:8088/",
+              "codec": "opus",
+              "bitrateKbps": 128,
+              "radioConfigPath": "radio.gon",
+              "trackCount": 1,
+              "tracks": [
+                {
+                  "id": "catsanova",
+                  "category": "songs",
+                  "relativePath": "audio/music/radio/songs/catsanova.opus",
+                  "url": "http://10.99.239.143:8088/audio/music/radio/songs/catsanova.opus",
+                  "bytes": 4,
+                  "sha256": "hash",
+                  "durationMs": 1000,
+                  "codec": "opus",
+                  "bitrateKbps": 128
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val normalized = manifest.normalizedAgainst("http://127.0.0.1:8088/manifest.json")
+
+        assertEquals("http://127.0.0.1:8088/", normalized.baseUrl)
+        assertEquals("http://127.0.0.1:8088/audio/music/radio/songs/catsanova.opus", normalized.tracks.first().url)
+    }
+
+    @Test
     fun cacheManagerDetectsHitMissMismatchAndClear() {
         val root = createTempDir(prefix = "radio-cache-test")
         try {

@@ -1,6 +1,6 @@
 package com.local.mewgenicsradio
 
-import kotlinx.serialization.SerialName
+import java.net.URI
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -16,6 +16,17 @@ data class RemoteRadioManifest(
 ) {
     val qualityLabel: String
         get() = "${codec.uppercase()} ${bitrateKbps}kbps"
+
+    fun normalizedAgainst(manifestUrl: String): RemoteRadioManifest {
+        val manifestBaseUri = URI(manifestUrl)
+        val normalizedBaseUrl = manifestBaseUri.resolve(".").toString()
+        return copy(
+            baseUrl = normalizedBaseUrl,
+            tracks = tracks.map { track ->
+                track.copy(url = manifestBaseUri.resolve(track.relativePath).toString())
+            },
+        )
+    }
 }
 
 @Serializable

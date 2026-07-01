@@ -32,7 +32,7 @@ class RadioRepository(
 
     fun loadRemoteManifest(manifestUrl: String): RemoteRadioManifest {
         val raw = URL(manifestUrl).openStream().bufferedReader().use { it.readText() }
-        return RemoteRadioManifestParser.parse(raw)
+        return RemoteRadioManifestParser.parse(raw).normalizedAgainst(manifestUrl)
     }
 
     fun loadCatalog(manifest: RemoteRadioManifest?): RadioAssetCatalog {
