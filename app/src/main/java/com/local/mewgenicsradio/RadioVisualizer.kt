@@ -51,9 +51,9 @@ fun RadioVisualizer(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = ((11000 / style.normalizedMotionScale) / playbackMotionScale)
+                durationMillis = ((6000 / style.normalizedMotionScale) / playbackMotionScale)
                     .toInt()
-                    .coerceAtLeast(3500),
+                    .coerceAtLeast(2000),
                 easing = FastOutSlowInEasing,
             ),
             repeatMode = RepeatMode.Restart,

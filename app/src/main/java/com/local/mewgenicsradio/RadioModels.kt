@@ -98,12 +98,12 @@ data class RadioVisualizerStyle(
 
 @Serializable
 data class RadioVisualizerPalette(
-    val skyTop: String = "#2A1637",
-    val skyBottom: String = "#130E1C",
-    val cloud: String = "#735E97",
-    val catprint: String = "#D9976C",
-    val atom: String = "#F3D46B",
-    val pile: String = "#3D2A2B",
+    val skyTop: String = "#4A2D6E",
+    val skyBottom: String = "#1A1030",
+    val cloud: String = "#9B7EC4",
+    val catprint: String = "#E8A87C",
+    val atom: String = "#F5D76E",
+    val pile: String = "#5A3D3E",
     val pileAccent: String = "#70524B",
     val overlay: String = "#F4EAD0",
 )

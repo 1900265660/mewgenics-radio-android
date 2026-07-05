@@ -78,7 +78,7 @@ fun RadioApp(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0x33110D10))
+                        .background(Color(0x1A110D10))
                         .padding(24.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
