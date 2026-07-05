@@ -66,94 +66,105 @@ fun RadioApp(
             modifier = Modifier.fillMaxSize(),
             color = Color(0xFF16140F),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+            Box(
+                modifier = Modifier.fillMaxSize(),
             ) {
-                Column {
-                    Text(
-                        text = "WMEW",
-                        color = Color(0xFFF7D36A),
-                        style = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Text(
-                        text = "99.9 Lives",
-                        color = Color(0xFFC5BFA8),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
+                RadioVisualizer(
+                    style = state.visualizerStyle,
+                    isPlaying = state.isPlaying,
+                    modifier = Modifier.fillMaxSize(),
+                )
 
-                RadioPanel(state = state)
-
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Button(
-                            onClick = onPlayPause,
-                            modifier = Modifier.weight(1f),
-                            enabled = state.isReady,
-                        ) {
-                            Text(if (state.isPlaying) "Pause" else "Play")
-                        }
-                        Button(
-                            onClick = onNext,
-                            modifier = Modifier.weight(1f),
-                            enabled = state.isReady,
-                        ) {
-                            Text("Next")
-                        }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0x33110D10))
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Text(
+                            text = "WMEW",
+                            color = Color(0xFFF7D36A),
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text(
+                            text = "99.9 Lives",
+                            color = Color(0xFFC5BFA8),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Button(
-                            onClick = { onModeChange(PlaybackMode.FullRadio) },
-                            modifier = Modifier.weight(1f),
-                            enabled = state.mode != PlaybackMode.FullRadio,
-                        ) {
-                            Text("Full Radio")
-                        }
-                        Button(
-                            onClick = { onModeChange(PlaybackMode.SongsOnly) },
-                            modifier = Modifier.weight(1f),
-                            enabled = state.mode != PlaybackMode.SongsOnly,
-                        ) {
-                            Text("Songs Only")
-                        }
-                    }
+                    RadioPanel(state = state)
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Button(
-                            onClick = onClearCache,
-                            modifier = Modifier.weight(1f),
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("Clear Cache")
+                            Button(
+                                onClick = onPlayPause,
+                                modifier = Modifier.weight(1f),
+                                enabled = state.isReady,
+                            ) {
+                                Text(if (state.isPlaying) "Pause" else "Play")
+                            }
+                            Button(
+                                onClick = onNext,
+                                modifier = Modifier.weight(1f),
+                                enabled = state.isReady,
+                            ) {
+                                Text("Next")
+                            }
                         }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Button(
+                                onClick = { onModeChange(PlaybackMode.FullRadio) },
+                                modifier = Modifier.weight(1f),
+                                enabled = state.mode != PlaybackMode.FullRadio,
+                            ) {
+                                Text("Full Radio")
+                            }
+                            Button(
+                                onClick = { onModeChange(PlaybackMode.SongsOnly) },
+                                modifier = Modifier.weight(1f),
+                                enabled = state.mode != PlaybackMode.SongsOnly,
+                            ) {
+                                Text("Songs Only")
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Button(
+                                onClick = onClearCache,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Clear Cache")
+                            }
+                            Button(
+                                onClick = onCacheSongs,
+                                modifier = Modifier.weight(1f),
+                                enabled = state.isReady,
+                            ) {
+                                Text("Cache Songs")
+                            }
+                        }
+
                         Button(
-                            onClick = onCacheSongs,
-                            modifier = Modifier.weight(1f),
+                            onClick = onCacheRadio,
+                            modifier = Modifier.fillMaxWidth(),
                             enabled = state.isReady,
                         ) {
-                            Text("Cache Songs")
+                            Text("Cache Full Radio")
                         }
-                    }
-
-                    Button(
-                        onClick = onCacheRadio,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state.isReady,
-                    ) {
-                        Text("Cache Full Radio")
                     }
                 }
             }
@@ -166,7 +177,7 @@ private fun RadioPanel(state: PlayerUiState) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF242014))
+            .background(Color(0xB3242014))
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -207,6 +218,12 @@ private fun RadioPanel(state: PlayerUiState) {
 
         Text(
             text = "Source: ${state.currentSource.name}  Quality: ${state.qualityLabel}",
+            color = Color(0xFFC5BFA8),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        Text(
+            text = "Visualizer: ${if (state.isPlaying) "Animated" else "Idle"}",
             color = Color(0xFFC5BFA8),
             style = MaterialTheme.typography.bodyMedium,
         )

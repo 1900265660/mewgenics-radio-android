@@ -56,6 +56,28 @@ class RadioRepository(
         return RadioAssetCatalog(remoteTracks + bundledTracks)
     }
 
+    fun loadVisualizerStyle(
+        manifest: RemoteRadioManifest?,
+        cacheManager: RadioCacheManager,
+    ): RadioVisualizerStyle {
+        val bundled = runCatching {
+            context.assets.open("radio/visualizer.json").bufferedReader().use { it.readText() }
+        }.getOrNull()
+        if (!bundled.isNullOrBlank()) {
+            return RadioVisualizerStyleParser.parse(bundled)
+        }
+
+        val remoteVisualizer = manifest?.visualizer ?: return RadioVisualizerStyle()
+        val source = if (cacheManager.isCached(remoteVisualizer)) {
+            cacheManager.cachedFileFor(remoteVisualizer)
+        } else {
+            cacheManager.cacheAsset(remoteVisualizer)
+        }
+        return source.bufferedReader().use { reader ->
+            RadioVisualizerStyleParser.parse(reader.readText())
+        }
+    }
+
     private fun listAssets(path: String): List<String> {
         val names = try {
             context.assets.list(path).orEmpty()

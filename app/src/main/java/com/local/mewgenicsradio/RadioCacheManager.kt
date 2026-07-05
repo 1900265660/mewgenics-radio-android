@@ -12,8 +12,8 @@ class RadioCacheManager(
         cacheRoot.mkdirs()
     }
 
-    fun cachedFileFor(track: RemoteRadioTrack): File =
-        File(cacheRoot, track.relativePath.replace("/", File.separator))
+    fun cachedFileFor(asset: CacheableRemoteAsset): File =
+        File(cacheRoot, asset.relativePath.replace("/", File.separator))
 
     fun cacheSizeBytes(): Long =
         cacheRoot.walkTopDown()
@@ -27,22 +27,24 @@ class RadioCacheManager(
         cacheRoot.mkdirs()
     }
 
-    fun isCached(track: RemoteRadioTrack): Boolean {
-        val file = cachedFileFor(track)
+    fun isCached(asset: CacheableRemoteAsset): Boolean {
+        val file = cachedFileFor(asset)
         return file.isFile &&
-            file.length() == track.bytes &&
-            sha256(file).equals(track.sha256, ignoreCase = true)
+            file.length() == asset.bytes &&
+            sha256(file).equals(asset.sha256, ignoreCase = true)
     }
 
-    fun cacheTrack(track: RemoteRadioTrack): File {
-        val target = cachedFileFor(track)
-        if (isCached(track)) return target
+    fun cacheTrack(track: RemoteRadioTrack): File = cacheAsset(track)
+
+    fun cacheAsset(asset: CacheableRemoteAsset): File {
+        val target = cachedFileFor(asset)
+        if (isCached(asset)) return target
 
         target.parentFile?.mkdirs()
         val temp = File(target.parentFile, "${target.name}.download")
         if (temp.exists()) temp.delete()
 
-        val connection = URL(track.url).openConnection() as HttpURLConnection
+        val connection = URL(asset.url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
@@ -57,15 +59,15 @@ class RadioCacheManager(
             connection.disconnect()
         }
 
-        if (temp.length() != track.bytes) {
+        if (temp.length() != asset.bytes) {
             temp.delete()
-            throw IllegalStateException("Downloaded size mismatch for ${track.relativePath}")
+            throw IllegalStateException("Downloaded size mismatch for ${asset.relativePath}")
         }
 
         val downloadedHash = sha256(temp)
-        if (!downloadedHash.equals(track.sha256, ignoreCase = true)) {
+        if (!downloadedHash.equals(asset.sha256, ignoreCase = true)) {
             temp.delete()
-            throw IllegalStateException("Downloaded hash mismatch for ${track.relativePath}")
+            throw IllegalStateException("Downloaded hash mismatch for ${asset.relativePath}")
         }
 
         if (target.exists()) target.delete()

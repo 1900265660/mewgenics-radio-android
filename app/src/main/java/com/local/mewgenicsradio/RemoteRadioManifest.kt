@@ -11,6 +11,7 @@ data class RemoteRadioManifest(
     val codec: String,
     val bitrateKbps: Int,
     val radioConfigPath: String = "radio.gon",
+    val visualizer: RemoteVisualizerAsset? = null,
     val trackCount: Int = 0,
     val tracks: List<RemoteRadioTrack>,
 ) {
@@ -22,6 +23,9 @@ data class RemoteRadioManifest(
         val normalizedBaseUrl = manifestBaseUri.resolve(".").toString()
         return copy(
             baseUrl = normalizedBaseUrl,
+            visualizer = visualizer?.copy(
+                url = manifestBaseUri.resolve(visualizer.relativePath).toString(),
+            ),
             tracks = tracks.map { track ->
                 track.copy(url = manifestBaseUri.resolve(track.relativePath).toString())
             },
@@ -33,14 +37,23 @@ data class RemoteRadioManifest(
 data class RemoteRadioTrack(
     val id: String,
     val category: String,
-    val relativePath: String,
-    val url: String,
-    val bytes: Long,
-    val sha256: String,
+    override val relativePath: String,
+    override val url: String,
+    override val bytes: Long,
+    override val sha256: String,
     val durationMs: Long,
     val codec: String,
     val bitrateKbps: Int,
-)
+) : CacheableRemoteAsset
+
+@Serializable
+data class RemoteVisualizerAsset(
+    val id: String = "music_visualizer",
+    override val relativePath: String,
+    override val url: String,
+    override val bytes: Long,
+    override val sha256: String,
+) : CacheableRemoteAsset
 
 object RemoteRadioManifestParser {
     val json = Json {

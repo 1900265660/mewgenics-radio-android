@@ -145,11 +145,19 @@ class RadioViewModel(
             val loadedCatalog = withContext(Dispatchers.IO) {
                 repository.loadCatalog(loadedManifest)
             }
+            val visualizerStyle = withContext(Dispatchers.IO) {
+                runCatching {
+                    repository.loadVisualizerStyle(loadedManifest, cacheManager)
+                }.getOrElse {
+                    RadioVisualizerStyle()
+                }
+            }
 
             if (!loadedCatalog.hasAnyTracks()) {
                 _uiState.value = _uiState.value.copy(
                     isReady = false,
                     message = "Radio audio assets are missing.",
+                    visualizerStyle = visualizerStyle,
                 )
                 return
             }
@@ -161,7 +169,12 @@ class RadioViewModel(
                 isReady = true,
                 cacheBytes = cacheManager.cacheSizeBytes(),
                 qualityLabel = loadedManifest?.qualityLabel ?: "Bundled Vorbis",
-                message = if (loadedManifest == null) "Ready: bundled assets" else "Ready: online cache",
+                visualizerStyle = visualizerStyle,
+                message = if (loadedManifest == null) {
+                    "Ready: bundled assets"
+                } else {
+                    "Ready: online cache"
+                },
             )
         } catch (error: Throwable) {
             _uiState.value = _uiState.value.copy(

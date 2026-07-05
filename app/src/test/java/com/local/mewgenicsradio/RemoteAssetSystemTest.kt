@@ -19,6 +19,13 @@ class RemoteAssetSystemTest {
               "codec": "opus",
               "bitrateKbps": 128,
               "radioConfigPath": "radio.gon",
+              "visualizer": {
+                "id": "music_visualizer",
+                "relativePath": "visualizer/music_visualizer.json",
+                "url": "https://cdn.example/radio/v1/visualizer/music_visualizer.json",
+                "bytes": 4,
+                "sha256": "hash"
+              },
               "trackCount": 1,
               "tracks": [
                 {
@@ -40,6 +47,7 @@ class RemoteAssetSystemTest {
         assertEquals("OPUS 128kbps", manifest.qualityLabel)
         assertEquals(1, manifest.tracks.size)
         assertEquals("catsanova", manifest.tracks.first().id)
+        assertEquals("music_visualizer", manifest.visualizer?.id)
     }
 
     @Test
@@ -52,6 +60,13 @@ class RemoteAssetSystemTest {
               "codec": "opus",
               "bitrateKbps": 128,
               "radioConfigPath": "radio.gon",
+              "visualizer": {
+                "id": "music_visualizer",
+                "relativePath": "visualizer/music_visualizer.json",
+                "url": "http://10.99.239.143:8088/visualizer/music_visualizer.json",
+                "bytes": 4,
+                "sha256": "hash"
+              },
               "trackCount": 1,
               "tracks": [
                 {
@@ -74,6 +89,7 @@ class RemoteAssetSystemTest {
 
         assertEquals("http://127.0.0.1:8088/", normalized.baseUrl)
         assertEquals("http://127.0.0.1:8088/audio/music/radio/songs/catsanova.opus", normalized.tracks.first().url)
+        assertEquals("http://127.0.0.1:8088/visualizer/music_visualizer.json", normalized.visualizer?.url)
     }
 
     @Test
@@ -156,6 +172,29 @@ class RemoteAssetSystemTest {
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test
+    fun visualizerParserClampsExtremeValues() {
+        val style = RadioVisualizerStyleParser.parse(
+            """
+            {
+              "motionScale": 9.0,
+              "contrast": 0.2,
+              "cloudCount": 20,
+              "atomCount": 1,
+              "catprintColumns": 99,
+              "catPilePeaks": 2
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(2.0f, style.normalizedMotionScale)
+        assertEquals(0.7f, style.normalizedContrast)
+        assertEquals(8, style.normalizedCloudCount)
+        assertEquals(4, style.normalizedAtomCount)
+        assertEquals(10, style.normalizedCatprintColumns)
+        assertEquals(3, style.normalizedCatPilePeaks)
     }
 
     private fun sha256(bytes: ByteArray): String {
