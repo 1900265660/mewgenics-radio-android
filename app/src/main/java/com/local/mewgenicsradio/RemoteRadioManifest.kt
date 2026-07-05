@@ -61,5 +61,8 @@ object RemoteRadioManifestParser {
         prettyPrint = false
     }
 
-    fun parse(raw: String): RemoteRadioManifest = json.decodeFromString(raw)
+    fun parse(raw: String): RemoteRadioManifest {
+        val clean = raw.trimStart('\uFEFF')
+        return json.decodeFromString(clean)
+    }
 }
