@@ -1,175 +1,59 @@
 # Mewgenics Radio Android
 
-Private Android test app for playing the Mewgenics radio mode outside the game.
+Mewgenics 电台模式的 Android 独立播放器。从游戏提取音频资源，通过 CDN 在线流式播放 547 首曲目，含原版六层音乐可视化动画。
 
-This repository contains only source code and local extraction tooling. It must
-not commit or redistribute original Mewgenics assets.
+## 下载
 
-## Current Goal
+[GitHub Releases](https://github.com/1900265660/mewgenics-radio-android/releases)
 
-Phase 2 adds a release-oriented online/cache path while keeping the private
-debug build usable with local assets:
+| APK | 说明 |
+|-----|------|
+| `app-onlineDebug.apk` | CDN 在线播放（推荐） |
+| `app-debug.apk` | 本地内置音频 |
 
-- Extract `audio/music/radio.gon` and `audio/music/radio/**/*.ogg` from your own
-  Steam install of Mewgenics.
-- Parse the original radio playlist and `radio_state_machine`.
-- Play the station on Android with Kotlin, Compose, and Media3.
+## 功能
 
-## Required Local Tools
+- 547 首完整曲目，Full Radio / Songs Only 切换
+- Compose Canvas 六层动画复刻原版可视化
+- 在线流媒体播放 + 按需缓存
 
-Install Android Studio first. The current machine did not initially have Java,
-Gradle, adb, or an Android SDK on `PATH`.
+## 本地构建
 
-Android Studio and the Android SDK were installed locally during project setup:
+需要 Android Studio 和 SDK。
 
-```text
-Android Studio: C:\Program Files\Android\Android Studio
-Android SDK: E:\Android\Sdk
-Local Gradle used for verification: E:\Android\gradle-8.10.2
-```
-
-For this PowerShell session, verify:
-
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$env:ANDROID_HOME = "E:\Android\Sdk"
-$env:Path = "$env:JAVA_HOME\bin;E:\Android\Sdk\platform-tools;$env:Path"
-
-& "$env:JAVA_HOME\bin\java.exe" -version
-& "$env:ANDROID_HOME\platform-tools\adb.exe" version
-```
-
-Open this folder in Android Studio:
-
-```text
-E:\Projects\mewgenics-radio-android
-```
-
-## Extract Local Assets
-
-Run the extractor from the repo root:
+### 提取本地资源
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\extract-radio-assets.ps1
 ```
 
-Default input:
+默认从 Steam 安装目录提取，输出到 `app/src/debug/assets/radio/`。
 
-```text
-E:\SteamLibrary\steamapps\common\Mewgenics\resources.gpak
-```
-
-Default output for private debug builds:
-
-```text
-.\app\src\debug\assets\radio
-```
-
-Expected output:
-
-```text
-app/src/debug/assets/radio/radio.gon
-app/src/debug/assets/radio/audio/music/radio/**/*.ogg
-```
-
-The output folder is ignored by Git. Do not commit extracted `.ogg`, `.swf`, or
-`.gpak` files.
-
-## Convert Assets for Online Playback
-
-The release architecture expects Opus files and a generated manifest. Install
-`ffmpeg` first, then run:
+### 构建
 
 ```powershell
-winget install --id Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
+# debug（本地资源）
+.\gradlew.bat :app:assembleDebug
+
+# onlineDebug（CDN 资源）
+.\gradlew.bat :app:assembleOnlineDebug
 ```
 
+### CDN 资源准备
+
 ```powershell
+# 安装 ffmpeg
+winget install --id Gyan.FFmpeg
+
+# 转换 + 生成 manifest
 powershell -ExecutionPolicy Bypass -File .\tools\convert-radio-assets.ps1 -BitrateKbps 128 -BaseUrl "https://your-cdn.example/radio/v1/"
-```
 
-Default output:
-
-```text
-dist/radio-assets/128kbps/manifest.json
-dist/radio-assets/128kbps/radio.gon
-dist/radio-assets/128kbps/audio/music/radio/**/*.opus
-```
-
-`dist/` and `.opus` files are ignored by Git. Upload this folder to your CDN or
-local test server, then set `RADIO_MANIFEST_URL` in the Android build config.
-
-## Local Streaming Test Server
-
-For LAN testing before a real CDN exists, generate the manifest with your
-computer's LAN IP and serve the output folder:
-
-```powershell
-$lanIp = "10.99.239.143"
-powershell -ExecutionPolicy Bypass -File .\tools\convert-radio-assets.ps1 -BitrateKbps 128 -BaseUrl "http://$lanIp:8088/"
+# 本地测试服务器
 python .\tools\serve-radio-assets.py --root .\dist\radio-assets\128kbps --host 0.0.0.0 --port 8088
 ```
 
-The server supports HTTP byte ranges, which Media3/ExoPlayer expects for
-reliable streaming. Smoke test it from another PowerShell window:
+## 限制
 
-```powershell
-Invoke-WebRequest "http://127.0.0.1:8088/manifest.json"
-curl.exe -I -r 0-99 "http://127.0.0.1:8088/audio/music/radio/songs/catsanova.opus"
-```
-
-Debug builds allow cleartext HTTP for local testing. Release builds keep
-cleartext disabled unless you explicitly opt in:
-
-```powershell
-.\gradlew.bat :app:assembleDebug -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json"
-.\gradlew.bat :app:assembleOnlineDebug -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json"
-.\gradlew.bat :app:assembleRelease -PRADIO_MANIFEST_URL="http://$lanIp:8088/manifest.json" -PALLOW_CLEARTEXT=true
-```
-
-Use `onlineDebug` for normal local streaming tests. It is signed with the debug
-key and does not include `app/src/debug/assets/radio`, so the APK stays small
-while still using the local HTTP server.
-
-## Build
-
-Once Android Studio has installed the Android SDK, run:
-
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$env:ANDROID_HOME = "E:\Android\Sdk"
-$env:Path = "$env:JAVA_HOME\bin;E:\Android\Sdk\platform-tools;$env:Path"
-
-.\gradlew.bat :app:testDebugUnitTest
-.\gradlew.bat :app:assembleDebug
-```
-
-The debug APK is written to:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-For online/release testing, pass the manifest URL without editing source code:
-
-```powershell
-.\gradlew.bat :app:assembleRelease -PRADIO_MANIFEST_URL="https://your-cdn.example/radio/v1/manifest.json"
-```
-
-The same value can also be provided through an environment variable:
-
-```powershell
-$env:RADIO_MANIFEST_URL = "https://your-cdn.example/radio/v1/manifest.json"
-.\gradlew.bat :app:assembleRelease
-```
-
-Debug/private builds can use `app/src/debug/assets/radio`. Release/public builds
-do not package that debug source set, so they stay small and require the online
-manifest path.
-
-## MVP Limits
-
-- This version does not restore the original SWF music visualizer.
-- Background media session behavior is not yet a release-quality feature.
-- Release/public builds should use the online manifest path and should not
-  include `app/src/debug/assets/radio`.
+- 动画为颜色近似复刻，非 SWF 精确还原
+- 无后台播放
+- Release 构建需要 CDN manifest URL

@@ -40,6 +40,7 @@ data class RadioTrack(
 data class PlaybackSegment(
     val stateName: String,
     val track: RadioTrack,
+    val associatedSongId: String? = null,
 )
 
 enum class PlaybackSource {
@@ -64,6 +65,8 @@ data class PlayerUiState(
     val cacheBytes: Long = 0,
     val qualityLabel: String = "Bundled",
     val message: String = "Extract radio assets before launching the app.",
+    val lastError: String? = null,
+    val errorLog: List<String> = emptyList(),
     val visualizerStyle: RadioVisualizerStyle = RadioVisualizerStyle(),
 )
 

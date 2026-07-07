@@ -8,7 +8,8 @@ class RadioScheduler(
     private val random: Random = Random.Default,
 ) {
     private var currentState = "begin"
-    private var currentSongId: String? = null
+    private var lastSongId: String? = null
+    private var queuedSong: RadioTrack? = null
 
     fun next(mode: PlaybackMode): PlaybackSegment? {
         repeat(12) {
@@ -20,17 +21,17 @@ class RadioScheduler(
 
             currentState = stateName
             val definition = config.stateMachine[stateName]
-            val track = pickTrack(definition, stateName, mode)
-            if (track != null) {
-                if (track.category == "songs") {
-                    currentSongId = track.id
+            val segment = pickSegment(definition, stateName, mode)
+            if (segment != null) {
+                if (segment.track.category == "songs") {
+                    lastSongId = segment.track.id
                 }
-                return PlaybackSegment(stateName = stateName, track = track)
+                return segment
             }
         }
 
         return catalog.songsFor(config).randomOrNull(random)?.let { track ->
-            currentSongId = track.id
+            lastSongId = track.id
             PlaybackSegment(stateName = "song", track = track)
         }
     }
@@ -41,28 +42,48 @@ class RadioScheduler(
         return nextStates.random(random)
     }
 
-    private fun pickTrack(
+    private fun pickSegment(
         definition: RadioStateDefinition?,
         stateName: String,
         mode: PlaybackMode,
-    ): RadioTrack? {
+    ): PlaybackSegment? {
         if (mode == PlaybackMode.SongsOnly || stateName == "songs_only") {
-            return catalog.songsFor(config).randomOrNull(random)
+            return catalog.songsFor(config)
+                .randomOrNull(random)
+                ?.let { PlaybackSegment(stateName = stateName, track = it, associatedSongId = it.id) }
         }
 
         val playlist = definition?.playlist
         if (playlist != null) {
             if (playlist == "songs") {
-                return catalog.songsFor(config).randomOrNull(random)
+                val track = queuedSong ?: catalog.songsFor(config).randomOrNull(random)
+                queuedSong = null
+                return track?.let {
+                    PlaybackSegment(stateName = stateName, track = it, associatedSongId = it.id)
+                }
             }
-            return catalog.tracksForCategory(playlist).randomOrNull(random)
+            return catalog.tracksForCategory(playlist)
+                .randomOrNull(random)
+                ?.let { PlaybackSegment(stateName = stateName, track = it) }
         }
 
         val specialPlaylist = definition?.specialPlaylist
         if (specialPlaylist != null) {
-            return catalog.specialTracks(specialPlaylist, currentSongId).randomOrNull(random)
+            val songId = if (definition.announcesUpcomingSong(stateName)) {
+                val song = queuedSong ?: catalog.songsFor(config).randomOrNull(random)
+                queuedSong = song
+                song?.id
+            } else {
+                lastSongId
+            }
+            return catalog.specialTracks(specialPlaylist, songId)
+                .randomOrNull(random)
+                ?.let { PlaybackSegment(stateName = stateName, track = it, associatedSongId = songId) }
         }
 
         return null
     }
+
+    private fun RadioStateDefinition.announcesUpcomingSong(stateName: String): Boolean =
+        nextStates.contains("song") || stateName.contains("intro", ignoreCase = true)
 }
