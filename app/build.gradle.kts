@@ -22,8 +22,8 @@ android {
         applicationId = "com.local.mewgenicsradio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-private"
+        versionCode = 120
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
