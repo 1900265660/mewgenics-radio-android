@@ -1,22 +1,32 @@
 package com.local.mewgenicsradio
 
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -41,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
@@ -70,7 +81,25 @@ class MainActivity : ComponentActivity() {
                 onModeChange = viewModel::setMode,
                 onClearCache = viewModel::clearCache,
                 onCacheCurrent = viewModel::cacheCurrentTrack,
+                onRequestBackgroundKeepAlive = ::requestBackgroundKeepAlive,
             )
+        }
+    }
+
+    @SuppressLint("BatteryLife")
+    private fun requestBackgroundKeepAlive() {
+        val packageUri = Uri.parse("package:$packageName")
+        val action = if (isIgnoringBatteryOptimizations(this)) {
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+        } else {
+            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+        }
+        val intent = Intent(action).setData(packageUri)
+
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(packageUri))
         }
     }
 }
@@ -83,10 +112,13 @@ fun RadioApp(
     onModeChange: (PlaybackMode) -> Unit,
     onClearCache: () -> Unit,
     onCacheCurrent: () -> Unit,
+    onRequestBackgroundKeepAlive: () -> Unit,
 ) {
     MaterialTheme {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
+        val configuration = LocalConfiguration.current
+        val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -95,6 +127,7 @@ fun RadioApp(
                     state = state,
                     onClearCache = onClearCache,
                     onCacheCurrent = onCacheCurrent,
+                    onRequestBackgroundKeepAlive = onRequestBackgroundKeepAlive,
                 )
             },
         ) {
@@ -102,96 +135,196 @@ fun RadioApp(
                 modifier = Modifier.fillMaxSize(),
                 color = Color(0xFF16140F),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF16140F)),
-                ) {
-                    VideoPlayer(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f),
+                if (isLandscape) {
+                    LandscapeRadioScreen(
+                        state = state,
+                        onOpenBackend = { scope.launch { drawerState.open() } },
+                        onPlayPause = onPlayPause,
+                        onNext = onNext,
+                        onModeChange = onModeChange,
                     )
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .background(Color(0x1A110D10))
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            Column {
-                                Text(
-                                    text = "WMEW",
-                                    color = Color(0xFFF7D36A),
-                                    style = MaterialTheme.typography.displayMedium,
-                                    fontWeight = FontWeight.Black,
-                                )
-                                Text(
-                                    text = "99.9 Lives",
-                                    color = Color(0xFFC5BFA8),
-                                    style = MaterialTheme.typography.titleLarge,
-                                )
-                            }
-
-                            TextButton(
-                                onClick = { scope.launch { drawerState.open() } },
-                            ) {
-                                Text("Backend")
-                            }
-                        }
-
-                        RadioPanel(state = state)
-
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Button(
-                                    onClick = onPlayPause,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = state.isReady,
-                                ) {
-                                    Text(if (state.isPlaying) "Pause" else "Play")
-                                }
-                                Button(
-                                    onClick = onNext,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = state.isReady,
-                                ) {
-                                    Text("Next")
-                                }
-                            }
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Button(
-                                    onClick = { onModeChange(PlaybackMode.FullRadio) },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = state.mode != PlaybackMode.FullRadio,
-                                ) {
-                                    Text("Full Radio")
-                                }
-                                Button(
-                                    onClick = { onModeChange(PlaybackMode.SongsOnly) },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = state.mode != PlaybackMode.SongsOnly,
-                                ) {
-                                    Text("Songs Only")
-                                }
-                            }
-                        }
-                    }
+                } else {
+                    PortraitRadioScreen(
+                        state = state,
+                        onOpenBackend = { scope.launch { drawerState.open() } },
+                        onPlayPause = onPlayPause,
+                        onNext = onNext,
+                        onModeChange = onModeChange,
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PortraitRadioScreen(
+    state: PlayerUiState,
+    onOpenBackend: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onModeChange: (PlaybackMode) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF16140F)),
+    ) {
+        VideoPlayer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f),
+        )
+
+        PlayerOptionsPanel(
+            state = state,
+            onOpenBackend = onOpenBackend,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onModeChange = onModeChange,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(Color(0x1A110D10))
+                .padding(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun LandscapeRadioScreen(
+    state: PlayerUiState,
+    onOpenBackend: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onModeChange: (PlaybackMode) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF16140F)),
+    ) {
+        VideoPlayer(modifier = Modifier.fillMaxSize())
+        PlayerOptionsPanel(
+            state = state,
+            onOpenBackend = onOpenBackend,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onModeChange = onModeChange,
+            scrollable = true,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(320.dp)
+                .background(Color(0xD9211D16))
+                .padding(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun PlayerOptionsPanel(
+    state: PlayerUiState,
+    onOpenBackend: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onModeChange: (PlaybackMode) -> Unit,
+    modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
+) {
+    val panelModifier = if (scrollable) {
+        modifier.verticalScroll(rememberScrollState())
+    } else {
+        modifier
+    }
+    Column(
+        modifier = panelModifier,
+        verticalArrangement = if (scrollable) {
+            Arrangement.spacedBy(16.dp)
+        } else {
+            Arrangement.SpaceBetween
+        },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column {
+                Text(
+                    text = "WMEW",
+                    color = Color(0xFFF7D36A),
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    text = "99.9 Lives",
+                    color = Color(0xFFC5BFA8),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+
+            TextButton(onClick = onOpenBackend) {
+                Text("Backend")
+            }
+        }
+
+        RadioPanel(state = state)
+
+        PlaybackControls(
+            state = state,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onModeChange = onModeChange,
+        )
+    }
+}
+
+@Composable
+private fun PlaybackControls(
+    state: PlayerUiState,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onModeChange: (PlaybackMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Button(
+                onClick = onPlayPause,
+                modifier = Modifier.weight(1f),
+                enabled = state.isReady,
+            ) {
+                Text(if (state.isPlaying) "Pause" else "Play")
+            }
+            Button(
+                onClick = onNext,
+                modifier = Modifier.weight(1f),
+                enabled = state.isReady,
+            ) {
+                Text("Next")
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Button(
+                onClick = { onModeChange(PlaybackMode.FullRadio) },
+                modifier = Modifier.weight(1f),
+                enabled = state.mode != PlaybackMode.FullRadio,
+            ) {
+                Text("Full Radio")
+            }
+            Button(
+                onClick = { onModeChange(PlaybackMode.SongsOnly) },
+                modifier = Modifier.weight(1f),
+                enabled = state.mode != PlaybackMode.SongsOnly,
+            ) {
+                Text("Songs Only")
             }
         }
     }
@@ -293,10 +426,15 @@ private fun BackendDrawer(
     state: PlayerUiState,
     onClearCache: () -> Unit,
     onCacheCurrent: () -> Unit,
+    onRequestBackgroundKeepAlive: () -> Unit,
 ) {
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
     val report = remember(state) { buildErrorReport(state) }
+    val isIgnoringBatteryOptimizations = remember(context) {
+        isIgnoringBatteryOptimizations(context)
+    }
 
     ModalDrawerSheet(
         modifier = Modifier.fillMaxWidth(0.86f),
@@ -327,9 +465,19 @@ private fun BackendDrawer(
             DiagnosticLine("Quality", state.qualityLabel)
             DiagnosticLine("Cache", formatBytes(state.cacheBytes))
             DiagnosticLine("Visualizer", if (state.isPlaying) "Animated" else "Idle")
+            DiagnosticLine(
+                "Background",
+                if (isIgnoringBatteryOptimizations) "Battery optimization ignored" else "Battery optimized",
+            )
 
             HorizontalDivider(color = Color(0xFF514735))
 
+            OutlinedButton(
+                onClick = onRequestBackgroundKeepAlive,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (isIgnoringBatteryOptimizations) "Open App Settings" else "Allow Background Playback")
+            }
             Button(
                 onClick = onCacheCurrent,
                 modifier = Modifier.fillMaxWidth(),
@@ -374,6 +522,11 @@ private fun BackendDrawer(
             )
         }
     }
+}
+
+private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
 }
 
 @Composable
