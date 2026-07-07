@@ -44,8 +44,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -119,6 +122,7 @@ fun RadioApp(
         val scope = rememberCoroutineScope()
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        var isLandscapePanelVisible by rememberSaveable { mutableStateOf(true) }
 
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -142,6 +146,8 @@ fun RadioApp(
                         onPlayPause = onPlayPause,
                         onNext = onNext,
                         onModeChange = onModeChange,
+                        isPanelVisible = isLandscapePanelVisible,
+                        onPanelVisibleChange = { isLandscapePanelVisible = it },
                     )
                 } else {
                     PortraitRadioScreen(
@@ -198,6 +204,8 @@ private fun LandscapeRadioScreen(
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onModeChange: (PlaybackMode) -> Unit,
+    isPanelVisible: Boolean,
+    onPanelVisibleChange: (Boolean) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -205,20 +213,32 @@ private fun LandscapeRadioScreen(
             .background(Color(0xFF16140F)),
     ) {
         VideoPlayer(modifier = Modifier.fillMaxSize())
-        PlayerOptionsPanel(
-            state = state,
-            onOpenBackend = onOpenBackend,
-            onPlayPause = onPlayPause,
-            onNext = onNext,
-            onModeChange = onModeChange,
-            scrollable = true,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .width(320.dp)
-                .background(Color(0xD9211D16))
-                .padding(18.dp),
-        )
+        if (isPanelVisible) {
+            PlayerOptionsPanel(
+                state = state,
+                onOpenBackend = onOpenBackend,
+                onPlayPause = onPlayPause,
+                onNext = onNext,
+                onModeChange = onModeChange,
+                onHide = { onPanelVisibleChange(false) },
+                scrollable = true,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(320.dp)
+                    .background(Color(0xD9211D16))
+                    .padding(18.dp),
+            )
+        } else {
+            Button(
+                onClick = { onPanelVisibleChange(true) },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(16.dp),
+            ) {
+                Text("Controls")
+            }
+        }
     }
 }
 
@@ -230,6 +250,7 @@ private fun PlayerOptionsPanel(
     onNext: () -> Unit,
     onModeChange: (PlaybackMode) -> Unit,
     modifier: Modifier = Modifier,
+    onHide: (() -> Unit)? = null,
     scrollable: Boolean = false,
 ) {
     val panelModifier = if (scrollable) {
@@ -264,8 +285,15 @@ private fun PlayerOptionsPanel(
                 )
             }
 
-            TextButton(onClick = onOpenBackend) {
-                Text("Backend")
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onOpenBackend) {
+                    Text("Backend")
+                }
+                if (onHide != null) {
+                    TextButton(onClick = onHide) {
+                        Text("Hide")
+                    }
+                }
             }
         }
 
