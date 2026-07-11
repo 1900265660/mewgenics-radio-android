@@ -22,18 +22,34 @@ class RadioViewModel(
     private val resolver = RadioAssetResolver(cacheManager)
     private val player = RadioPlayer(
         context = appContext,
-        onEnded = { playNext() },
+        onEnded = {
+            consecutiveFailures = 0  // 成功播放完，重置计数器
+            playNext()
+        },
         onError = { error ->
-            _uiState.value = _uiState.value.copy(
-                isPlaying = false,
-                message = "Playback failed: ${error.message ?: "check network/cache"}",
-            )
+            consecutiveFailures++
+            if (consecutiveFailures >= maxConsecutiveFailures) {
+                // 连续失败太多次，停止播放并显示错误
+                _uiState.value = _uiState.value.copy(
+                    isPlaying = false,
+                    message = "Too many playback failures: ${error.message ?: "check network/cache"}",
+                )
+                consecutiveFailures = 0  // 重置计数器
+            } else {
+                // 自动跳过失败的曲目
+                _uiState.value = _uiState.value.copy(
+                    message = "Skipping failed track ($consecutiveFailures/$maxConsecutiveFailures): ${error.message ?: "unknown error"}",
+                )
+                playNext()
+            }
         },
     )
 
     private var scheduler: RadioScheduler? = null
     private var catalog: RadioAssetCatalog? = null
     private var manifest: RemoteRadioManifest? = null
+    private var consecutiveFailures = 0
+    private val maxConsecutiveFailures = 5
 
     init {
         viewModelScope.launch {
@@ -83,6 +99,7 @@ class RadioViewModel(
             }
 
             player.play(resolved)
+            consecutiveFailures = 0  // 开始播放新曲目，重置失败计数器
             _uiState.value = _uiState.value.copy(
                 isReady = true,
                 isPlaying = true,
