@@ -105,4 +105,60 @@ class RadioConfigParserTest {
             assertTrue(segment.track.assetPath in validPaths)
         }
     }
+
+    @Test
+    fun schedulerQueuesAnnouncedSongAfterIntro() {
+        val config = RadioConfigParser().parse(
+            """
+            all [
+                catsanova
+                battle_of_the_fleabags
+            ]
+
+            radio_state_machine {
+                begin {
+                    next [intro]
+                }
+
+                intro {
+                    special_playlist intros
+                    next [song]
+                }
+
+                song {
+                    playlist songs
+                    next [intro]
+                }
+            }
+            """.trimIndent(),
+        )
+        val catalog = RadioAssetCatalog(
+            listOf(
+                RadioTrack("catsanova", "songs", "radio/audio/music/radio/songs/catsanova.ogg"),
+                RadioTrack("battle_of_the_fleabags", "songs", "radio/audio/music/radio/songs/battle_of_the_fleabags.ogg"),
+                RadioTrack("catsanova_1", "intros", "radio/audio/music/radio/intros/catsanova_1.ogg"),
+                RadioTrack(
+                    "battle_of_the_fleabags_1",
+                    "intros",
+                    "radio/audio/music/radio/intros/battle_of_the_fleabags_1.ogg",
+                ),
+            ),
+        )
+        val scheduler = RadioScheduler(config, catalog, Random(4))
+
+        repeat(20) {
+            val intro = scheduler.next(PlaybackMode.FullRadio)
+            assertNotNull(intro)
+            assertEquals("intro", intro.stateName)
+            assertEquals("intros", intro.track.category)
+            assertNotNull(intro.associatedSongId)
+            assertTrue(intro.track.id.startsWith(intro.associatedSongId))
+
+            val song = scheduler.next(PlaybackMode.FullRadio)
+            assertNotNull(song)
+            assertEquals("song", song.stateName)
+            assertEquals("songs", song.track.category)
+            assertEquals(intro.associatedSongId, song.track.id)
+        }
+    }
 }

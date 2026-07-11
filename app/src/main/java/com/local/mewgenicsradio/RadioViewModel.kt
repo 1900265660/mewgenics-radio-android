@@ -28,17 +28,15 @@ class RadioViewModel(
         },
         onError = { error ->
             consecutiveFailures++
+            recordError("Playback failed", error)
             if (consecutiveFailures >= maxConsecutiveFailures) {
-                // 连续失败太多次，停止播放并显示错误
                 _uiState.value = _uiState.value.copy(
                     isPlaying = false,
-                    message = "Too many playback failures: ${error.message ?: "check network/cache"}",
+                    message = "Too many playback failures (${consecutiveFailures}). Check your network and try again.",
                 )
-                consecutiveFailures = 0  // 重置计数器
             } else {
-                // 自动跳过失败的曲目
                 _uiState.value = _uiState.value.copy(
-                    message = "Skipping failed track ($consecutiveFailures/$maxConsecutiveFailures): ${error.message ?: "unknown error"}",
+                    message = "Skipping failed track (${consecutiveFailures}/${maxConsecutiveFailures})",
                 )
                 playNext()
             }
@@ -77,10 +75,7 @@ class RadioViewModel(
         viewModelScope.launch {
             val next = scheduler?.next(_uiState.value.mode)
             if (next == null) {
-                _uiState.value = _uiState.value.copy(
-                    isPlaying = false,
-                    message = "No playable radio assets were found.",
-                )
+                recordError("No playable radio assets were found.")
                 return@launch
             }
 
@@ -89,11 +84,15 @@ class RadioViewModel(
             }
 
             if (resolved == null) {
-                _uiState.value = _uiState.value.copy(
-                    isPlaying = false,
-                    currentSegment = next,
-                    currentSource = PlaybackSource.Missing,
-                    message = "Track is missing locally and remotely.",
+                val message = "Track is missing locally and remotely."
+                _uiState.value = withErrorLog(
+                    state = _uiState.value.copy(
+                        isPlaying = false,
+                        currentSegment = next,
+                        currentSource = PlaybackSource.Missing,
+                        message = message,
+                    ),
+                    detail = message,
                 )
                 return@launch
             }
@@ -130,19 +129,13 @@ class RadioViewModel(
         }
     }
 
-    fun cacheAllSongs() {
-        val tracks = catalog?.allTracks
-            .orEmpty()
-            .filter { it.category == "songs" }
-            .mapNotNull { it.remote }
-        cacheInBackground(tracks, "Caching songs")
-    }
-
-    fun cacheAllRadio() {
-        val tracks = catalog?.allTracks
-            .orEmpty()
-            .mapNotNull { it.remote }
-        cacheInBackground(tracks, "Caching radio")
+    fun cacheCurrentTrack() {
+        val remote = _uiState.value.currentSegment?.track?.remote
+        if (remote == null) {
+            _uiState.value = _uiState.value.copy(message = "Current track is not remote-cacheable")
+            return
+        }
+        cacheInBackground(listOf(remote), "Caching current track")
     }
 
     private suspend fun load() {
@@ -171,10 +164,14 @@ class RadioViewModel(
             }
 
             if (!loadedCatalog.hasAnyTracks()) {
-                _uiState.value = _uiState.value.copy(
-                    isReady = false,
-                    message = "Radio audio assets are missing.",
-                    visualizerStyle = visualizerStyle,
+                val message = "Radio audio assets are missing."
+                _uiState.value = withErrorLog(
+                    state = _uiState.value.copy(
+                        isReady = false,
+                        message = message,
+                        visualizerStyle = visualizerStyle,
+                    ),
+                    detail = message,
                 )
                 return
             }
@@ -194,10 +191,7 @@ class RadioViewModel(
                 },
             )
         } catch (error: Throwable) {
-            _uiState.value = _uiState.value.copy(
-                isReady = false,
-                message = error.message ?: "Could not load radio assets.",
-            )
+            recordError("Could not load radio assets", error)
         }
     }
 
@@ -210,9 +204,12 @@ class RadioViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             var cached = 0
             tracks.forEach { track ->
-                runCatching {
+                val result = runCatching {
                     cacheManager.cacheTrack(track)
                     cached++
+                }
+                result.exceptionOrNull()?.let { error ->
+                    recordError("Cache failed for ${track.relativePath}", error)
                 }
                 updateCacheState("$label: $cached/${tracks.size}")
             }
@@ -232,5 +229,28 @@ class RadioViewModel(
     override fun onCleared() {
         player.release()
         super.onCleared()
+    }
+
+    private fun recordError(label: String, error: Throwable? = null) {
+        val detail = if (error == null) {
+            label
+        } else {
+            "$label: ${error.message ?: error::class.java.simpleName}"
+        }
+        _uiState.value = withErrorLog(
+            state = _uiState.value.copy(
+                isPlaying = false,
+                message = detail,
+            ),
+            detail = detail,
+        )
+    }
+
+    private fun withErrorLog(state: PlayerUiState, detail: String): PlayerUiState {
+        val nextLog = (state.errorLog + detail).takeLast(8)
+        return state.copy(
+            lastError = detail,
+            errorLog = nextLog,
+        )
     }
 }
